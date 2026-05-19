@@ -1,24 +1,75 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { BookOpen, User, Lock, LogIn } from 'lucide-react';
+import { BookOpen, User, Lock, LogIn, Mail } from 'lucide-react';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { supabase } from '../../lib/supabase';
 
 export function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple authentication logic
-    if (isAdmin) {
-      navigate('/admin');
+    setLoading(true);
+    
+    try {
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName }
+          }
+        });
+        if (error) throw error;
+        alert('Registration successful! Please sign in.');
+        setIsSignUp(false);
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        
+        // Check profile role to route correctly
+        if (data.user) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
+          if (profile?.role === 'admin') {
+            navigate('/admin');
+          } else {
+            navigate('/');
+          }
+        }
+      }
+    } catch (error: any) {
+      alert(error.message || 'An error occurred during authentication');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!email) {
+      alert('Please enter your email address first to reset your password.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password',
+    });
+    setLoading(false);
+    if (error) {
+      alert('Error: ' + error.message);
     } else {
-      navigate('/');
+      alert('Password reset link sent! Check your email.');
     }
   };
 
@@ -40,31 +91,51 @@ export function Login() {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <div className="w-20 h-20 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-full flex items-center justify-center shadow-xl">
-                <BookOpen className="w-10 h-10 text-white" />
+              <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-xl overflow-hidden bg-slate-100">
+                <img src="/logo.jpg" alt="Library Logo" className="w-full h-full object-cover" />
               </div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full border-2 border-white" />
             </div>
           </div>
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Library</h1>
-            <p className="text-slate-600">Welcome back! Please enter your details.</p>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+              {isSignUp ? 'Create Account' : 'Access Library'}
+            </h1>
+            <p className="text-slate-600">
+              {isSignUp ? 'Sign up to reserve books' : 'Welcome back! Please enter your details.'}
+            </p>
           </div>
 
           {/* Login Form */}
-          <form onSubmit={handleLogin} className="space-y-5">
-            {/* Username Field */}
+          <form onSubmit={handleAuth} className="space-y-5">
+            {isSignUp && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Full Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="pl-10 bg-slate-50 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                    required={isSignUp}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Email Field */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Username</label>
+              <label className="text-sm font-medium text-slate-700">Email Address</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
                   className="pl-10 bg-slate-50 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   required
                 />
@@ -80,46 +151,43 @@ export function Login() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder={isSignUp ? "Create a password" : "Enter your password"}
                   className="pl-10 bg-slate-50 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                   required
                 />
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isAdmin}
-                  onChange={(e) => setIsAdmin(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                />
-                <span className="text-slate-600">Login as Admin</span>
-              </label>
-              <a href="#" className="text-emerald-600 hover:text-emerald-700 font-medium">
-                Forgot password?
-              </a>
-            </div>
+            {/* Forgot Password */}
+            {!isSignUp && (
+              <div className="flex items-center justify-end text-sm">
+                <button type="button" onClick={handleResetPassword} className="text-emerald-600 hover:text-emerald-700 font-medium">
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
-            {/* Sign In Button */}
+            {/* Sign In / Sign Up Button */}
             <Button
               type="submit"
+              disabled={loading}
               className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg h-11"
             >
               <LogIn className="w-5 h-5 mr-2" />
-              Sign In
+              {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
             </Button>
           </form>
 
-          {/* Sign Up Link */}
+          {/* Toggle Link */}
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-600">
-              New to the library?{' '}
-              <a href="#" className="text-emerald-600 hover:text-emerald-700 font-semibold">
-                Create an account
-              </a>
+              {isSignUp ? 'Already have an account?' : 'New to the library?'}
+              <button
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="ml-2 text-emerald-600 hover:text-emerald-700 font-semibold"
+              >
+                {isSignUp ? 'Sign in instead' : 'Create an account'}
+              </button>
             </p>
           </div>
         </div>

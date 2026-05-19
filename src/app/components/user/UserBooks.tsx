@@ -1,89 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, BookOpen, BookmarkPlus, FileText } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-
-const booksData = [
-  {
-    id: 7,
-    title: 'The power of Now',
-    edition: '1st, 1999',
-    author: 'Eckhart Tolle',
-    pages: 191,
-    quantity: 1,
-    status: 'Available',
-  },
-  {
-    id: 10,
-    title: 'How Europe Underdeveloped Africa',
-    edition: '1st, 1972',
-    author: 'Walter Rodney',
-    pages: 361,
-    quantity: 6,
-    status: 'Available',
-  },
-  {
-    id: 11,
-    title: 'A play of Giants',
-    edition: '1st, 1984',
-    author: 'Wole Soyinka',
-    pages: 69,
-    quantity: 1,
-    status: 'Available',
-  },
-  {
-    id: 12,
-    title: 'The Wretched of the Earth',
-    edition: '1st, 1963',
-    author: 'Frantz Fanon',
-    pages: 255,
-    quantity: 4,
-    status: 'Available',
-  },
-  {
-    id: 13,
-    title: 'Class Struggle in Africa',
-    edition: '2nd, 1972',
-    author: 'Oseagefo Kwame Nkrumah',
-    pages: 48,
-    quantity: 50,
-    status: 'Available',
-  },
-  {
-    id: 14,
-    title: 'Precolonial Black Africa',
-    edition: '1st, 1987',
-    author: 'Cheikh Anta Diop',
-    pages: 255,
-    quantity: 2,
-    status: 'Available',
-  },
-  {
-    id: 15,
-    title: 'The West and the Rest of Us..',
-    edition: '1st, 1975',
-    author: 'Chinweizu Ibekwe',
-    pages: 540,
-    quantity: 1,
-    status: 'Available',
-  },
-  {
-    id: 16,
-    title: 'The Holocaust Industry',
-    edition: '1st, 2000',
-    author: 'Norman G. Finkelstein',
-    pages: 192,
-    quantity: 4,
-    status: 'Available',
-  },
-];
+import { supabase } from '../../../lib/supabase';
 
 export function UserBooks() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [books, setBooks] = useState<any[]>([]);
+  const [reserving, setReserving] = useState<string | null>(null);
 
-  const filteredBooks = booksData.filter(
+  useEffect(() => {
+    fetchBooks();
+  }, []);
+
+  const fetchBooks = async () => {
+    const { data, error } = await supabase.from('books').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      setBooks(data);
+    }
+  };
+
+  const handleReserve = async (bookId: string) => {
+    setReserving(bookId);
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        alert("Please log in to reserve books.");
+        return;
+      }
+      
+      const userId = userData.user.id;
+      
+      const { error } = await supabase.from('borrows').insert([
+        { book_id: bookId, user_id: userId, status: 'pending' }
+      ]);
+      
+      if (error) {
+        console.error("Error reserving book:", error);
+        alert("Failed to reserve book. You might have already requested it.");
+      } else {
+        alert("Book reserved successfully! It is now pending approval.");
+      }
+    } finally {
+      setReserving(null);
+    }
+  };
+
+  const filteredBooks = books.filter(
     (book) =>
       book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       book.author.toLowerCase().includes(searchTerm.toLowerCase())
@@ -154,14 +119,25 @@ export function UserBooks() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      <Button 
+                        size="sm" 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => handleReserve(book.id)}
+                        disabled={reserving === book.id || book.status !== 'Available' || book.quantity < 1}
+                      >
                         <BookmarkPlus className="w-4 h-4 mr-1" />
-                        Reserve
+                        {reserving === book.id ? 'Reserving...' : 'Reserve'}
                       </Button>
-                      {book.quantity > 1 && (
-                        <Button size="sm" variant="outline" className="border-slate-200">
-                          <FileText className="w-4 h-4" />
-                        </Button>
+                      {book.pdf_url && (
+                        <a 
+                          href={book.pdf_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-slate-200 bg-white hover:bg-slate-100 h-8 px-3"
+                        >
+                          <FileText className="w-4 h-4 mr-1" />
+                          Read
+                        </a>
                       )}
                     </div>
                   </td>
@@ -198,10 +174,27 @@ export function UserBooks() {
                   {book.status}
                 </Badge>
               </div>
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-                <BookmarkPlus className="w-4 h-4 mr-2" />
-                Reserve Book
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => handleReserve(book.id)}
+                  disabled={reserving === book.id || book.status !== 'Available' || book.quantity < 1}
+                >
+                  <BookmarkPlus className="w-4 h-4 mr-2" />
+                  {reserving === book.id ? 'Reserving...' : 'Reserve'}
+                </Button>
+                {book.pdf_url && (
+                  <a 
+                    href={book.pdf_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center flex-1 rounded-md text-sm font-medium border border-slate-200 bg-white hover:bg-slate-100"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Read PDF
+                  </a>
+                )}
+              </div>
             </div>
           </Card>
         ))}
@@ -211,7 +204,7 @@ export function UserBooks() {
       <div className="text-sm text-slate-600">
         <p>
           Showing <span className="font-semibold text-slate-900">{filteredBooks.length}</span> of{' '}
-          <span className="font-semibold text-slate-900">{booksData.length}</span> books
+          <span className="font-semibold text-slate-900">{books.length}</span> books
         </p>
       </div>
     </div>

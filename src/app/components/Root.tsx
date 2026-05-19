@@ -1,20 +1,27 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { Home, BookOpen, Users, User, MessageSquare, LogOut } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export function Root() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
 
   const navItems = [
-    { path: '/', label: 'Home', icon: Home },
-    { path: '/books', label: 'Books', icon: BookOpen },
-    { path: '/users', label: 'Users', icon: Users },
-    { path: '/profile', label: 'Profile', icon: User },
-    { path: '/insights', label: 'Insights', icon: MessageSquare },
+    { path: '/admin', label: 'Home', icon: Home },
+    { path: '/admin/books', label: 'Books', icon: BookOpen },
+    { path: '/admin/users', label: 'Users', icon: Users },
+    { path: '/admin/profile', label: 'Profile', icon: User },
+    { path: '/admin/insights', label: 'Insights', icon: MessageSquare },
   ];
 
   const isActive = (path: string) => {
-    if (path === '/') {
-      return location.pathname === '/';
+    if (path === '/admin') {
+      return location.pathname === '/admin' || location.pathname === '/admin/';
     }
     return location.pathname.startsWith(path);
   };
@@ -26,8 +33,8 @@ export function Root() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-slate-100">
+                <img src="/logo.jpg" alt="Library Logo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="font-bold text-slate-900">LibraryHub</h1>
@@ -57,7 +64,10 @@ export function Root() {
               })}
             </nav>
 
-            <button className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+            >
               <LogOut className="w-4 h-4" />
               <span className="text-sm font-medium hidden sm:inline">Logout</span>
             </button>

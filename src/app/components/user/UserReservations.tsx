@@ -1,32 +1,31 @@
-import { Clock, CheckCircle, XCircle, Calendar } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Clock, CheckCircle, XCircle, Calendar, RefreshCcw } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
-
-const reservationsData = [
-  {
-    id: 14,
-    bookName: 'Precolonial Black Africa',
-    approveStatus: 'Pending',
-    issueDate: '2026-01-27',
-    returnDate: '2026-01-30',
-  },
-  {
-    id: 11,
-    bookName: 'A play of Giants',
-    approveStatus: 'Denied',
-    issueDate: null,
-    returnDate: null,
-  },
-  {
-    id: 7,
-    bookName: 'The power of Now',
-    approveStatus: 'Denied',
-    issueDate: null,
-    returnDate: null,
-  },
-];
+import { supabase } from '../../../lib/supabase';
 
 export function UserReservations() {
+  const [reservations, setReservations] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchReservations();
+  }, []);
+
+  const fetchReservations = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData?.user) {
+      const { data, error } = await supabase
+        .from('borrows')
+        .select('id, status, borrow_date, return_date, books(title)')
+        .eq('user_id', userData.user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setReservations(data);
+      }
+    }
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -34,35 +33,44 @@ export function UserReservations() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Pending':
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'pending':
         return (
           <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
             <Clock className="w-3 h-3 mr-1" />
             Pending
           </Badge>
         );
-      case 'Denied':
+      case 'rejected':
+      case 'denied':
         return (
           <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
             <XCircle className="w-3 h-3 mr-1" />
-            Denied
+            {s.charAt(0).toUpperCase() + s.slice(1)}
           </Badge>
         );
-      case 'Approved':
+      case 'approved':
         return (
           <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
             <CheckCircle className="w-3 h-3 mr-1" />
             Approved
           </Badge>
         );
+      case 'returned':
+        return (
+          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+            <RefreshCcw className="w-3 h-3 mr-1" />
+            Returned
+          </Badge>
+        );
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge>{status || 'Unknown'}</Badge>;
     }
   };
 
-  const pendingReservations = reservationsData.filter((r) => r.approveStatus === 'Pending');
-  const deniedReservations = reservationsData.filter((r) => r.approveStatus === 'Denied');
+  const pendingReservations = reservations.filter((r) => r.status === 'pending');
+  const deniedReservations = reservations.filter((r) => r.status === 'rejected');
 
   return (
     <div className="space-y-6">
@@ -107,7 +115,7 @@ export function UserReservations() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-emerald-100 text-sm mb-1">Total</p>
-                <p className="text-3xl font-bold">{reservationsData.length}</p>
+                <p className="text-3xl font-bold">{reservations.length}</p>
               </div>
               <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                 <CheckCircle className="w-6 h-6" />
@@ -131,23 +139,25 @@ export function UserReservations() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {reservationsData.map((reservation) => (
+              {reservations.map((reservation) => (
                 <tr key={reservation.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-slate-600">{reservation.id}</td>
-                  <td className="px-6 py-4">
-                    <span className="font-medium text-slate-900">{reservation.bookName}</span>
+                  <td className="px-6 py-4 text-sm text-slate-600">
+                    <span className="truncate max-w-[100px] inline-block">{reservation.id}</span>
                   </td>
-                  <td className="px-6 py-4">{getStatusBadge(reservation.approveStatus)}</td>
+                  <td className="px-6 py-4">
+                    <span className="font-medium text-slate-900">{reservation.books?.title || 'Unknown Book'}</span>
+                  </td>
+                  <td className="px-6 py-4">{getStatusBadge(reservation.status)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <Calendar className="w-4 h-4 text-slate-400" />
-                      {formatDate(reservation.issueDate)}
+                      {formatDate(reservation.borrow_date)}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <Calendar className="w-4 h-4 text-slate-400" />
-                      {formatDate(reservation.returnDate)}
+                      {formatDate(reservation.return_date)}
                     </div>
                   </td>
                 </tr>
@@ -159,24 +169,24 @@ export function UserReservations() {
 
       {/* Mobile Cards View */}
       <div className="grid gap-4 md:hidden">
-        {reservationsData.map((reservation) => (
+        {reservations.map((reservation) => (
           <Card key={reservation.id} className="bg-white border-slate-200">
             <div className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="font-semibold text-slate-900">{reservation.bookName}</h3>
-                  <p className="text-sm text-slate-500 mt-1">ID: {reservation.id}</p>
+                  <h3 className="font-semibold text-slate-900">{reservation.books?.title || 'Unknown Book'}</h3>
+                  <p className="text-sm text-slate-500 mt-1 truncate max-w-[200px]">ID: {reservation.id}</p>
                 </div>
-                {getStatusBadge(reservation.approveStatus)}
+                {getStatusBadge(reservation.status)}
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Issue Date:</span>
-                  <span className="font-medium text-slate-900">{formatDate(reservation.issueDate)}</span>
+                  <span className="font-medium text-slate-900">{formatDate(reservation.borrow_date)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Return Date:</span>
-                  <span className="font-medium text-slate-900">{formatDate(reservation.returnDate)}</span>
+                  <span className="font-medium text-slate-900">{formatDate(reservation.return_date)}</span>
                 </div>
               </div>
             </div>
@@ -185,7 +195,7 @@ export function UserReservations() {
       </div>
 
       {/* Empty State */}
-      {reservationsData.length === 0 && (
+      {reservations.length === 0 && (
         <Card className="bg-white border-slate-200">
           <div className="p-12 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
