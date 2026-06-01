@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Lock, TrendingUp, Save, Camera } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -8,13 +9,86 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 export function Profile() {
-  const [firstName, setFirstName] = useState('kofo');
+  const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('08109038043');
-  const [email, setEmail] = useState('rasaqademola007@gmail.com');
-  const [address, setAddress] = useState('Ikhhbuwkfuuwvkz');
-  const [dateOfBirth, setDateOfBirth] = useState('01/28/2020');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [insight, setInsight] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setEmail(user.email || '');
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (data) {
+        if (data.full_name) {
+          const parts = data.full_name.split(' ');
+          setFirstName(parts[0]);
+          setLastName(parts.slice(1).join(' '));
+        }
+        setPhoneNumber(data.phone_number || '');
+        setAddress(data.address || '');
+        setDateOfBirth(data.date_of_birth || '');
+      }
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fullName = [firstName, lastName].filter(Boolean).join(' ');
+      const { error } = await supabase.from('profiles').update({
+        full_name: fullName,
+        phone_number: phoneNumber,
+        address: address,
+        date_of_birth: dateOfBirth
+      }).eq('id', user.id);
+
+      if (error) {
+        alert("Failed to update profile.");
+        console.error(error);
+      } else {
+        alert("Profile updated successfully!");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+    if (newPassword.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+    
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setLoading(false);
+    
+    if (error) alert("Failed to change password: " + error.message);
+    else {
+      alert("Password changed successfully!");
+      setNewPassword('');
+      setConfirmPassword('');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -31,7 +105,7 @@ export function Profile() {
             <div className="relative">
               <Avatar className="w-24 h-24 border-4 border-white/20">
                 <AvatarFallback className="bg-white text-indigo-600 text-2xl font-bold">
-                  {firstName.charAt(0).toUpperCase()}
+                  {firstName?.charAt(0)?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <button className="absolute bottom-0 right-0 w-8 h-8 bg-white text-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
@@ -125,8 +199,8 @@ export function Profile() {
                   <Input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="bg-slate-50 border-slate-200"
+                    disabled
+                    className="bg-slate-100 border-slate-200 cursor-not-allowed text-slate-500"
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
@@ -150,9 +224,13 @@ export function Profile() {
               </div>
 
               <div className="flex justify-end mt-6">
-                <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white">
+                <Button 
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                  onClick={handleUpdateProfile}
+                  disabled={loading}
+                >
                   <Save className="w-4 h-4 mr-2" />
-                  Update Profile
+                  {loading ? 'Saving...' : 'Update Profile'}
                 </Button>
               </div>
             </div>
@@ -179,6 +257,8 @@ export function Profile() {
                   <Input
                     type="password"
                     placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
                     className="bg-slate-50 border-slate-200"
                   />
                 </div>
@@ -187,15 +267,21 @@ export function Profile() {
                   <Input
                     type="password"
                     placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     className="bg-slate-50 border-slate-200"
                   />
                 </div>
               </div>
 
               <div className="flex justify-end mt-6">
-                <Button className="bg-red-600 hover:bg-red-700 text-white">
+                <Button 
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={handleChangePassword}
+                  disabled={loading}
+                >
                   <Lock className="w-4 h-4 mr-2" />
-                  Change Password
+                  {loading ? 'Updating...' : 'Change Password'}
                 </Button>
               </div>
             </div>

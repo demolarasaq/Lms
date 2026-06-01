@@ -1,8 +1,33 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { useState, useEffect } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { Home, BookOpen, Clock, FileCheck, RotateCcw, User, LogOut } from 'lucide-react';
+import { supabase } from '../../../lib/supabase';
 
 export function UserRoot() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [userName, setUserName] = useState('...');
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+      if (data?.full_name) {
+        setUserName(data.full_name);
+      } else {
+        setUserName(user.email?.split('@')[0] || 'User');
+      }
+    }
+  };
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -27,12 +52,12 @@ export function UserRoot() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-xl flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-slate-100">
+                <img src="/logo.jpg" alt="Library Logo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="font-bold text-slate-900">LibraryHub</h1>
-                <p className="text-xs text-slate-500">Welcome afonja!</p>
+                <p className="text-xs text-slate-500">Welcome {userName}!</p>
               </div>
             </div>
 
@@ -58,7 +83,10 @@ export function UserRoot() {
               })}
             </nav>
 
-            <button className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+            >
               <LogOut className="w-4 h-4" />
               <span className="text-sm font-medium hidden sm:inline">Logout</span>
             </button>

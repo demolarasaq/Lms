@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import { Root } from "./components/Root";
 import { Dashboard } from "./components/Dashboard";
+import { AddBook } from "./components/AddBook";
 import { Books } from "./components/Books";
 import { Users } from "./components/Users";
 import { Profile } from "./components/Profile";
@@ -13,8 +14,13 @@ import { UserIssues } from "./components/user/UserIssues";
 import { UserReturns } from "./components/user/UserReturns";
 import { UserProfile } from "./components/user/UserProfile";
 import { Login } from "./components/Login";
+import { ResetPassword } from "./components/ResetPassword";
 
 export const router = createBrowserRouter([
+  {
+    path: "/reset-password",
+    Component: ResetPassword,
+  },
   {
     path: "/login",
     Component: Login,
@@ -25,6 +31,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Dashboard },
       { path: "books", Component: Books },
+      { path: "books/add", Component: AddBook },
       { path: "users", Component: Users },
       { path: "profile", Component: Profile },
       { path: "insights", Component: Insights },

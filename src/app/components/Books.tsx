@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter, Plus, BookOpen, Trash2, Eye } from 'lucide-react';
+import { Link } from 'react-router';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { supabase } from '../../lib/supabase';
 
 const booksData = [
   {
@@ -72,10 +74,35 @@ const booksData = [
 ];
 
 export function Books() {
+  const [books, setBooks] = useState<any[]>(booksData);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
-  const filteredBooks = booksData.filter(
+  useEffect(() => {
+    fetchBooks();
+  }, []);
+
+  const fetchBooks = async () => {
+    const { data, error } = await supabase.from('books').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      if (data.length > 0) {
+        setBooks(data);
+      }
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this book?')) {
+      const { error } = await supabase.from('books').delete().eq('id', id);
+      if (!error) {
+        setBooks((currentBooks) => currentBooks.filter((book) => book.id !== id));
+      } else {
+        alert('Failed to delete book.');
+      }
+    }
+  };
+
+  const filteredBooks = books.filter(
     (book) =>
       book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       book.author.toLowerCase().includes(searchTerm.toLowerCase())
@@ -89,10 +116,12 @@ export function Books() {
           <h2 className="text-3xl font-bold text-slate-900">Book Collection</h2>
           <p className="text-slate-600 mt-1">Manage your library's book inventory</p>
         </div>
-        <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg">
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Book
-        </Button>
+        <Link to="/admin/books/add">
+          <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg">
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Book
+          </Button>
+        </Link>
       </div>
 
       {/* Search and Filter */}
@@ -180,8 +209,11 @@ export function Books() {
                         <button className="p-2 hover:bg-indigo-50 rounded-lg transition-colors">
                           <Eye className="w-4 h-4 text-indigo-600" />
                         </button>
-                        <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                          <Trash2 className="w-4 h-4 text-red-600" />
+                        <button 
+                          onClick={() => handleDelete(book.id)}
+                          className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -218,7 +250,12 @@ export function Books() {
                     <Eye className="w-4 h-4 mr-1" />
                     View
                   </Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => handleDelete(book.id)}
+                  >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -232,7 +269,7 @@ export function Books() {
       <div className="flex items-center justify-between text-sm text-slate-600">
         <p>
           Showing <span className="font-semibold text-slate-900">{filteredBooks.length}</span> of{' '}
-          <span className="font-semibold text-slate-900">{booksData.length}</span> books
+          <span className="font-semibold text-slate-900">{books.length}</span> books
         </p>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" disabled>
